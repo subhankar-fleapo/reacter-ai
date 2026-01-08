@@ -20,7 +20,8 @@ import * as repositories from './repositories';
           migrations,
           migrationsRun: !!configService.get('RUN_DB_MIGRATIONS_ON_START'),
           migrationsTransactionMode: 'each' as const,
-          migrationsTableName: 'reacter_migrations',
+          migrationsTableName: 'migrations',
+          schema: 'reacter_ai',
           namingStrategy: new SnakeNamingStrategy(),
           uuidExtension: 'pgcrypto',
           ...(configService.get('DATABASE_CERTIFICATE_AUTHORITY') && {
