@@ -1,10 +1,11 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import * as entities from './entities';
 import * as migrations from './migrations';
 import * as repositories from './repositories';
+import { readFileSync } from 'fs';
 
 @Global()
 @Module({
@@ -14,7 +15,7 @@ import * as repositories from './repositories';
       useFactory: (configService: ConfigService) => {
         const databaseUrl = configService.get<string>('DATABASE_URL');
 
-        const baseConfig = {
+        const baseConfig: TypeOrmModuleOptions = {
           type: 'postgres' as const,
           entities,
           migrations,
@@ -24,18 +25,16 @@ import * as repositories from './repositories';
           schema: 'reacter_ai',
           namingStrategy: new SnakeNamingStrategy(),
           uuidExtension: 'pgcrypto',
-          ...(configService.get('DATABASE_CERTIFICATE_AUTHORITY') && {
-            ssl: {
-              ca: configService.getOrThrow('DATABASE_CERTIFICATE_AUTHORITY'),
-            },
-          }),
+          ssl: {
+            ca: readFileSync('pg-ca.pem'),
+          },
         };
 
         if (databaseUrl) {
           return {
             ...baseConfig,
             url: databaseUrl,
-          };
+          } as TypeOrmModuleOptions;
         }
 
         return {
@@ -45,7 +44,7 @@ import * as repositories from './repositories';
           username: configService.getOrThrow('DATABASE_USERNAME'),
           password: configService.getOrThrow('DATABASE_PASSWORD'),
           database: configService.getOrThrow('DATABASE_NAME'),
-        };
+        } as TypeOrmModuleOptions;
       },
     }),
   ],

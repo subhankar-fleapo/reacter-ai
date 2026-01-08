@@ -1,3 +1,4 @@
+import { readFileSync } from 'fs';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
@@ -19,11 +20,9 @@ const dataSourceOptions: DataSourceOptions = {
   logging: false,
   uuidExtension: 'pgcrypto',
   migrationsTransactionMode: 'each',
-  ...(process.env.DATABASE_CERTIFICATE_AUTHORITY && {
-    ssl: {
-      ca: process.env.DATABASE_CERTIFICATE_AUTHORITY,
-    },
-  }),
+  ssl: {
+    ca: readFileSync('pg-ca.pem'),
+  },
 };
 
 export default new DataSource(dataSourceOptions);
