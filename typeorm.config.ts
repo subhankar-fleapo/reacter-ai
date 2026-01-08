@@ -1,13 +1,16 @@
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
+const hasDatabaseUrl = !!process.env.DATABASE_URL;
+
 const dataSourceOptions: DataSourceOptions = {
   type: 'postgres',
-  host: process.env.DATABASE_HOST,
-  port: Number(process.env.DATABASE_PORT),
-  username: process.env.DATABASE_USERNAME,
-  password: process.env.DATABASE_PASSWORD,
-  database: process.env.DATABASE_NAME,
+  url: process.env.DATABASE_URL,
+  host: hasDatabaseUrl ? undefined : process.env.DATABASE_HOST,
+  port: hasDatabaseUrl ? undefined : Number(process.env.DATABASE_PORT),
+  username: hasDatabaseUrl ? undefined : process.env.DATABASE_USERNAME,
+  password: hasDatabaseUrl ? undefined : process.env.DATABASE_PASSWORD,
+  database: hasDatabaseUrl ? undefined : process.env.DATABASE_NAME,
   entities: ['src/data/entities/**/*.entity.ts'],
   migrations: ['src/data/migrations/[!index]*.ts'],
   namingStrategy: new SnakeNamingStrategy(),

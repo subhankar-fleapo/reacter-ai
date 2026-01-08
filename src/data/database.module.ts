@@ -11,26 +11,41 @@ import * as repositories from './repositories';
   imports: [
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.getOrThrow('DATABASE_HOST'),
-        port: configService.getOrThrow('DATABASE_PORT'),
-        username: configService.getOrThrow('DATABASE_USERNAME'),
-        password: configService.getOrThrow('DATABASE_PASSWORD'),
-        database: configService.getOrThrow('DATABASE_NAME'),
-        entities,
-        migrations,
-        migrationsRun: !!configService.get('RUN_DB_MIGRATIONS_ON_START'),
-        migrationsTransactionMode: 'each',
-        migrationsTableName: 'reacter_migrations',
-        namingStrategy: new SnakeNamingStrategy(),
-        uuidExtension: 'pgcrypto',
-        ...(configService.get('DATABASE_CERTIFICATE_AUTHORITY') && {
-          ssl: {
-            ca: configService.getOrThrow('DATABASE_CERTIFICATE_AUTHORITY'),
-          },
-        }),
-      }),
+      useFactory: (configService: ConfigService) => {
+        const databaseUrl = configService.get<string>('DATABASE_URL');
+
+        const baseConfig = {
+          type: 'postgres' as const,
+          entities,
+          migrations,
+          migrationsRun: !!configService.get('RUN_DB_MIGRATIONS_ON_START'),
+          migrationsTransactionMode: 'each' as const,
+          migrationsTableName: 'reacter_migrations',
+          namingStrategy: new SnakeNamingStrategy(),
+          uuidExtension: 'pgcrypto',
+          ...(configService.get('DATABASE_CERTIFICATE_AUTHORITY') && {
+            ssl: {
+              ca: configService.getOrThrow('DATABASE_CERTIFICATE_AUTHORITY'),
+            },
+          }),
+        };
+
+        if (databaseUrl) {
+          return {
+            ...baseConfig,
+            url: databaseUrl,
+          };
+        }
+
+        return {
+          ...baseConfig,
+          host: configService.getOrThrow('DATABASE_HOST'),
+          port: configService.getOrThrow('DATABASE_PORT'),
+          username: configService.getOrThrow('DATABASE_USERNAME'),
+          password: configService.getOrThrow('DATABASE_PASSWORD'),
+          database: configService.getOrThrow('DATABASE_NAME'),
+        };
+      },
     }),
   ],
   providers: Object.values(repositories),
