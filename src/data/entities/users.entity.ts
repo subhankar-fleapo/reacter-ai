@@ -15,6 +15,15 @@ export class UsersEntity {
   @Column({ unique: true })
   email: string;
 
+  @Column({ nullable: true })
+  name: string;
+
+  @Column({ nullable: true })
+  wp_id: string;
+
+  @Column({ nullable: true })
+  wp_number: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

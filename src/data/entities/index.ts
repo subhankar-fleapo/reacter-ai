@@ -1,2 +1,2 @@
 export * from './users.entity';
-export * from '../../calendar/entities/calendar-token.entity';
+export * from './user-google-token.entity';

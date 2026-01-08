@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { google } from 'googleapis';
-import { CalendarToken } from './entities/calendar-token.entity';
+import { UserGoogleTokenEntity } from '../data/entities/user-google-token.entity';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 
@@ -11,8 +11,8 @@ export class CalendarService {
   private oauth2Client;
 
   constructor(
-    @InjectRepository(CalendarToken)
-    private calendarTokenRepository: Repository<CalendarToken>,
+    @InjectRepository(UserGoogleTokenEntity)
+    private userGoogleTokenRepository: Repository<UserGoogleTokenEntity>,
   ) {
     this.oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
@@ -21,54 +21,9 @@ export class CalendarService {
     );
   }
 
-  async checkConnection(userId: string): Promise<{ isConnected: boolean }> {
-    const token = await this.calendarTokenRepository.findOne({
-      where: { userId, isConnected: true },
-    });
-    return { isConnected: !!token };
-  }
-
-  generateAuthUrl(): string {
-    const scopes = [
-      'https://www.googleapis.com/auth/calendar',
-      'https://www.googleapis.com/auth/calendar.events',
-    ];
-
-    return this.oauth2Client.generateAuthUrl({
-      access_type: 'offline',
-      scope: scopes,
-      prompt: 'consent',
-    });
-  }
-
-  async saveTokens(userId: string, code: string): Promise<CalendarToken> {
-    const { tokens } = await this.oauth2Client.getToken(code);
-    
-    let calendarToken = await this.calendarTokenRepository.findOne({
-      where: { userId },
-    });
-
-    if (calendarToken) {
-      calendarToken.accessToken = tokens.access_token;
-      calendarToken.refreshToken = tokens.refresh_token || calendarToken.refreshToken;
-      calendarToken.expiryDate = tokens.expiry_date;
-      calendarToken.isConnected = true;
-    } else {
-      calendarToken = this.calendarTokenRepository.create({
-        userId,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        expiryDate: tokens.expiry_date,
-        isConnected: true,
-      });
-    }
-
-    return this.calendarTokenRepository.save(calendarToken);
-  }
-
   private async getAuthenticatedClient(userId: string) {
-    const token = await this.calendarTokenRepository.findOne({
-      where: { userId, isConnected: true },
+    const token = await this.userGoogleTokenRepository.findOne({
+      where: { userId },
     });
 
     if (!token) {
@@ -78,7 +33,7 @@ export class CalendarService {
     this.oauth2Client.setCredentials({
       access_token: token.accessToken,
       refresh_token: token.refreshToken,
-      expiry_date: token.expiryDate,
+      expiry_date: Number(token.expiresAt),
     });
 
     return google.calendar({ version: 'v3', auth: this.oauth2Client });
@@ -114,7 +69,7 @@ export class CalendarService {
         dateTime: createEventDto.endDateTime,
         timeZone: createEventDto.timeZone || 'UTC',
       },
-      attendees: createEventDto.attendees?.map(email => ({ email })),
+      attendees: createEventDto.attendees?.map((email) => ({ email })),
     };
 
     const response = await calendar.events.insert({
@@ -136,7 +91,11 @@ export class CalendarService {
     return response.data;
   }
 
-  async updateEvent(userId: string, eventId: string, updateEventDto: UpdateEventDto) {
+  async updateEvent(
+    userId: string,
+    eventId: string,
+    updateEventDto: UpdateEventDto,
+  ) {
     const calendar = await this.getAuthenticatedClient(userId);
 
     const existingEvent = await this.getEvent(userId, eventId);
@@ -146,15 +105,21 @@ export class CalendarService {
       summary: updateEventDto.summary || existingEvent.summary,
       description: updateEventDto.description || existingEvent.description,
       location: updateEventDto.location || existingEvent.location,
-      start: updateEventDto.startDateTime ? {
-        dateTime: updateEventDto.startDateTime,
-        timeZone: updateEventDto.timeZone || 'UTC',
-      } : existingEvent.start,
-      end: updateEventDto.endDateTime ? {
-        dateTime: updateEventDto.endDateTime,
-        timeZone: updateEventDto.timeZone || 'UTC',
-      } : existingEvent.end,
-      attendees: updateEventDto.attendees?.map(email => ({ email })) || existingEvent.attendees,
+      start: updateEventDto.startDateTime
+        ? {
+            dateTime: updateEventDto.startDateTime,
+            timeZone: updateEventDto.timeZone || 'UTC',
+          }
+        : existingEvent.start,
+      end: updateEventDto.endDateTime
+        ? {
+            dateTime: updateEventDto.endDateTime,
+            timeZone: updateEventDto.timeZone || 'UTC',
+          }
+        : existingEvent.end,
+      attendees:
+        updateEventDto.attendees?.map((email) => ({ email })) ||
+        existingEvent.attendees,
     };
 
     const response = await calendar.events.update({

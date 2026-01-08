@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, Headers } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  Headers,
+} from '@nestjs/common';
 import { CalendarService } from './calendar.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
@@ -6,26 +16,6 @@ import { UpdateEventDto } from './dto/update-event.dto';
 @Controller('calendar')
 export class CalendarController {
   constructor(private readonly calendarService: CalendarService) {}
-
-  @Get('check-connection')
-  async checkConnection(@Headers('user-id') userId: string) {
-    return this.calendarService.checkConnection(userId);
-  }
-
-  @Get('auth-url')
-  getAuthUrl() {
-    const url = this.calendarService.generateAuthUrl();
-    return { authUrl: url };
-  }
-
-  @Post('callback')
-  async handleCallback(
-    @Body('code') code: string,
-    @Body('userId') userId: string,
-  ) {
-    const token = await this.calendarService.saveTokens(userId, code);
-    return { message: 'Calendar connected successfully', token };
-  }
 
   @Get('events')
   async getEvents(
