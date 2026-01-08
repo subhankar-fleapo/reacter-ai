@@ -17,6 +17,7 @@ import * as repositories from './repositories';
         const baseConfig = {
           type: 'postgres' as const,
           entities,
+          synchronize: true,
           migrations,
           migrationsRun: !!configService.get('RUN_DB_MIGRATIONS_ON_START'),
           migrationsTransactionMode: 'each' as const,
