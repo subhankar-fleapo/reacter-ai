@@ -14,4 +14,20 @@ export class UsersRepository extends Repository<UsersEntity> {
   public getUserById(input: { id: string }): Promise<UsersEntity> {
     return this.findOneByOrFail({ id: input.id });
   }
+
+  public findByPhone(phone: string): Promise<UsersEntity | null> {
+    return this.findOne({ where: { phone } });
+  }
+
+  public async createUser(input: {
+    phone: string;
+    password: string;
+  }): Promise<UsersEntity> {
+    const user = this.create({
+      phone: input.phone,
+      password: input.password,
+    });
+
+    return this.save(user);
+  }
 }

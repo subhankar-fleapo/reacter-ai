@@ -13,7 +13,10 @@ export class UsersEntity {
   id: string;
 
   @Column({ unique: true })
-  email: string;
+  phone: string;
+
+  @Column({})
+  password: string;
 
   @CreateDateColumn()
   createdAt: Date;
