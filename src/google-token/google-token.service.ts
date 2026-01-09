@@ -4,8 +4,15 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { UsersRepository, GoogleTokenRepository } from '../data/repositories';
-import { UpsertGoogleTokenDto } from './google-token.dto';
+import {
+  UsersRepository,
+  GoogleTokenRepository,
+  MessageRepository,
+} from '../data/repositories';
+import {
+  GetGoogleTokenByPhoneDto,
+  UpsertGoogleTokenDto,
+} from './google-token.dto';
 
 @Injectable()
 export class GoogleTokenService {
@@ -13,6 +20,7 @@ export class GoogleTokenService {
     private readonly jwtService: JwtService,
     private readonly usersRepository: UsersRepository,
     private readonly googleTokenRepository: GoogleTokenRepository,
+    private readonly messageRepository: MessageRepository,
   ) {}
 
   async getForUser(authHeader: string) {
@@ -21,7 +29,7 @@ export class GoogleTokenService {
     return record ?? { exists: false };
   }
 
-  async getForPhone(phone: string) {
+  async getForPhone(phone: string, phoneDto: GetGoogleTokenByPhoneDto) {
     const trimmedPhone = phone?.trim();
     if (!trimmedPhone) {
       throw new BadRequestException('phone is required');
@@ -32,8 +40,17 @@ export class GoogleTokenService {
     if (!user) {
       return { exists: false };
     }
+
+    await this.messageRepository.createMessage({
+      prompt: phoneDto.message,
+      response: null,
+      userId: user.id,
+    });
+
     const record = await this.googleTokenRepository.findByUserId(user.id);
-    return record ?? { exists: false };
+    return record
+      ? { exists: true, message: phoneDto.message }
+      : { exists: false, message: phoneDto.message };
   }
 
   async upsertForUser(authHeader: string, dto: UpsertGoogleTokenDto) {

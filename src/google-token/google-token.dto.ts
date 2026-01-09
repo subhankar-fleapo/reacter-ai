@@ -4,3 +4,7 @@ export class UpsertGoogleTokenDto {
   refreshToken: string;
   expiresAt: string;
 }
+
+export class GetGoogleTokenByPhoneDto {
+  message: string;
+}
