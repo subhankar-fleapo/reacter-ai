@@ -46,7 +46,12 @@ export class GoogleTokenService {
       where: { phone: trimmedPhone },
     });
     if (!user) {
-      return { exists: false };
+      return {
+        success: false,
+        phone,
+        message:
+          'You are not registered with us. Please register here: https://reacterai.lovable.app/',
+      };
     }
 
     await this.messageRepository.createMessage({
@@ -54,6 +59,17 @@ export class GoogleTokenService {
       response: null,
       userId: user.id,
     });
+
+    const record = await this.googleTokenRepository.findByUserId(user.id);
+
+    if (!record) {
+      return {
+        success: false,
+        phone,
+        message:
+          'Your google calendar is not connected. Please connect your google account here: https://reacterai.lovable.app/',
+      };
+    }
 
     const response = await this.aiService.generateResponse({
       prompt: phoneDto.message,
@@ -63,30 +79,46 @@ export class GoogleTokenService {
 
     const parsedResponse = JSON.parse(response as any);
 
-    let message: string = '';
+    if (!parsedResponse) {
+      return {
+        message: 'Something went wrong. Please try again.',
+        success: false,
+        phone,
+      };
+    }
 
     if (parsedResponse.action === 'create') {
       await this.createGoogleEvent(parsedResponse, user.id);
-      message = 'Event created successfully';
+      return {
+        message: 'Event created successfully',
+        success: true,
+        phone,
+      };
     } else if (parsedResponse.action === 'update') {
       await this.updateGoogleEvent(
         user.id,
         parsedResponse.eventId,
         parsedResponse,
       );
-      message = 'Event updated successfully';
+      return {
+        message: 'Event updated successfully',
+        success: true,
+        phone,
+      };
     } else if (parsedResponse.action === 'delete') {
       await this.deleteGoogleEvent(user.id, parsedResponse.eventId);
-      message = 'Event deleted successfully';
+      return {
+        message: 'Event deleted successfully',
+        success: true,
+        phone,
+      };
+    } else {
+      return {
+        message: 'Invalid action. Please try again.',
+        success: false,
+        phone,
+      };
     }
-
-    const record = await this.googleTokenRepository.findByUserId(user.id);
-
-    return {
-      message,
-      exists: record ? true : false,
-      phone,
-    };
   }
 
   async upsertForUser(authHeader: string, dto: UpsertGoogleTokenDto) {
