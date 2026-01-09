@@ -22,6 +22,7 @@ WORKDIR /app
 COPY --chown=node:node --from=build /app/dist ./dist
 COPY --chown=node:node --from=build /app/node_modules ./node_modules
 COPY --chown=node:node pg-ca.pem ./
+COPY --chown=node:node credentials.json ./
 
 EXPOSE 8080
 
