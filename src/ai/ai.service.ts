@@ -11,23 +11,38 @@ export class AIService {
 
   public async generateResponse(input: {
     prompt: string;
+    history?: { role: 'user' | 'assistant'; content: string }[];
   }): Promise<AIResponseDto> {
     try {
+      const messages: any[] = [
+        {
+          role: 'system',
+          content: `Today is ${now}. Use this as the reference for words like today, tomorrow, yesterday. 
+          You are a helpful assistant that manages google calendar.
+          If the user wants to perform an action (create, update, delete), you must ensure you have all the necessary details.
+          For 'create' and 'update', you NEED 'title', 'startDateTime', and 'endDateTime'.
+          If any of these are missing or ambiguous, you MUST NOT return a 'create' or 'update' action.
+          Instead, you should return a response asking the user for the missing details.
+          The 'response' field should contain the question to the user.
+          Do NOT make up dates or times.
+          
+          If the user's request is not about calendar actions, or if you need more info, just chat with them.
+          Set the 'action' to 'create' ONLY when you have ALL details (title, startDateTime, endDateTime).
+          `,
+        },
+        ...(input.history || []),
+        {
+          role: 'user',
+          content: input.prompt,
+        },
+      ];
+
       const { data } = await this.httpService.axiosRef.post<AIResponseOutput>(
         '/chat/completions',
         {
           model: 'mistralai/devstral-2512:free',
           stream: false,
-          messages: [
-            {
-              role: 'system',
-              content: `Today is ${now}. Use this as the reference for words like today, tomorrow, yesterday.`,
-            },
-            {
-              role: 'user',
-              content: input.prompt,
-            },
-          ],
+          messages,
           response_format: {
             type: 'json_schema',
             json_schema: {
@@ -65,13 +80,7 @@ export class AIService {
                     description: 'Response from the model',
                   },
                 },
-                required: [
-                  'tool',
-                  'action',
-                  'response',
-                  'startDateTime',
-                  'endDateTime',
-                ],
+                required: ['tool', 'action', 'response'],
                 additionalProperties: false,
               },
             },

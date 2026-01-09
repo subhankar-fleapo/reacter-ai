@@ -83,30 +83,60 @@ export class GoogleTokenService {
         };
       }
 
-      await this.messageRepository.createMessage({
-        prompt: phoneDto.message,
-        response: null,
-        userId: user.id,
-      });
+      const history = await this.messageRepository.getLastMessages(user.id, 10);
 
-      const record = await this.googleTokenRepository.findByUserId(user.id);
+      const formattedHistory = history
+        .map((msg) => {
+          let content = msg.response;
+          try {
+            if (content) {
+              const parsed = JSON.parse(content);
+              if (parsed && parsed.response) {
+                content = parsed.response;
+              }
+            }
+          } catch {
+            // ignore error, use original content
+          }
 
-      if (!record) {
-        return {
-          success: false,
-          phone,
-          message:
-            'Your google calendar is not connected. Please connect your google account here: https://reacterai.lovable.app/',
-        };
-      }
+          return [
+            { role: 'user', content: msg.prompt },
+            content ? { role: 'assistant', content: content } : null,
+          ];
+        })
+        .flat()
+        .filter((msg) => msg !== null)
+        .reverse() as {
+        role: 'user' | 'assistant';
+        content: string;
+      }[];
 
       const response = await this.aiService.generateResponse({
         prompt: phoneDto.message,
+        history: formattedHistory,
       });
 
-      console.log(response);
+      await this.messageRepository.createMessage({
+        prompt: phoneDto.message,
+        response:
+          typeof response === 'string' ? response : JSON.stringify(response),
+        userId: user.id,
+      });
 
-      const parsedResponse = JSON.parse(response as any);
+      let parsedResponse: any = response;
+      try {
+        if (typeof response === 'string') {
+          parsedResponse = JSON.parse(response);
+        }
+      } catch (e) {
+        // If it's not JSON, it might be a plain text response (fallback)
+        console.error('Failed to parse response', e);
+        return {
+          message: response as unknown as string,
+          success: true,
+          phone,
+        };
+      }
 
       if (!parsedResponse) {
         return {
@@ -116,35 +146,45 @@ export class GoogleTokenService {
         };
       }
 
-      if (parsedResponse.action === 'create') {
-        await this.createGoogleEvent(parsedResponse, user.id);
-        return {
-          message: 'Event created successfully',
-          success: true,
-          phone,
-        };
-      } else if (parsedResponse.action === 'update') {
-        await this.updateGoogleEvent(
-          user.id,
-          parsedResponse.eventId,
-          parsedResponse,
-        );
-        return {
-          message: 'Event updated successfully',
-          success: true,
-          phone,
-        };
-      } else if (parsedResponse.action === 'delete') {
+      // If the AI just wants to chat or asks for info (action might be 'create' but missing fields)
+      // Check for required fields for actions
+      const { action } = parsedResponse;
+
+      if (action === 'create' || action === 'update') {
+        // delete all messages
+        await this.messageRepository.deleteMessages(user.id);
+
+        if (action === 'create') {
+          await this.createGoogleEvent(parsedResponse, user.id);
+          return {
+            message: parsedResponse.response || 'Event created successfully',
+            success: true,
+            phone,
+          };
+        } else {
+          await this.updateGoogleEvent(
+            user.id,
+            parsedResponse.eventId,
+            parsedResponse,
+          );
+          return {
+            message: parsedResponse.response || 'Event updated successfully',
+            success: true,
+            phone,
+          };
+        }
+      } else if (action === 'delete') {
         await this.deleteGoogleEvent(user.id, parsedResponse.eventId);
         return {
-          message: 'Event deleted successfully',
+          message: parsedResponse.response || 'Event deleted successfully',
           success: true,
           phone,
         };
       } else {
+        // Fallback for other actions or just chat
         return {
-          message: 'Invalid action. Please try again.',
-          success: false,
+          message: parsedResponse.response,
+          success: true,
           phone,
         };
       }
