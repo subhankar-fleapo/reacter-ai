@@ -63,22 +63,30 @@ export class GoogleTokenService {
 
     const parsedResponse = JSON.parse(response as any);
 
+    let message: string = '';
+
     if (parsedResponse.action === 'create') {
       await this.createGoogleEvent(parsedResponse, user.id);
+      message = 'Event created successfully';
     } else if (parsedResponse.action === 'update') {
       await this.updateGoogleEvent(
         user.id,
         parsedResponse.eventId,
         parsedResponse,
       );
+      message = 'Event updated successfully';
     } else if (parsedResponse.action === 'delete') {
       await this.deleteGoogleEvent(user.id, parsedResponse.eventId);
+      message = 'Event deleted successfully';
     }
 
     const record = await this.googleTokenRepository.findByUserId(user.id);
-    return record
-      ? { exists: true, message: phoneDto.message }
-      : { exists: false, message: phoneDto.message };
+
+    return {
+      message,
+      exists: record ? true : false,
+      phone,
+    };
   }
 
   async upsertForUser(authHeader: string, dto: UpsertGoogleTokenDto) {

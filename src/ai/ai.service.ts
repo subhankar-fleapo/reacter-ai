@@ -3,6 +3,8 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { Actions, Tools } from './dto';
 import { AIResponseDto, AIResponseOutput } from './dto/ai.dto';
 
+const now = new Date().toISOString();
+
 @Injectable()
 export class AIService {
   constructor(private readonly httpService: HttpService) {}
@@ -17,6 +19,10 @@ export class AIService {
           model: 'mistralai/devstral-2512:free',
           stream: false,
           messages: [
+            {
+              role: 'system',
+              content: `Today is ${now}. Use this as the reference for words like today, tomorrow, yesterday.`,
+            },
             {
               role: 'user',
               content: input.prompt,
@@ -65,6 +71,7 @@ export class AIService {
                   'response',
                   'startDateTime',
                   'endDateTime',
+                  'recipients',
                 ],
                 additionalProperties: false,
               },
