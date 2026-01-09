@@ -50,4 +50,12 @@ export class SlackController {
       throw new InternalServerErrorException(error);
     }
   }
+
+  @Get('/profile')
+  async profile() {
+    return this.service.sendMessage(
+      '#test-integration',
+      'Event Created Successfully!',
+    );
+  }
 }
