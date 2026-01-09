@@ -38,83 +38,92 @@ export class GoogleTokenService {
   }
 
   async getForPhone(phone: string, phoneDto: GetGoogleTokenByPhoneDto) {
-    const trimmedPhone = phone?.trim();
-    if (!trimmedPhone) {
-      throw new BadRequestException('phone is required');
-    }
-    const user = await this.usersRepository.findOne({
-      where: { phone: trimmedPhone },
-    });
-    if (!user) {
-      return {
-        success: false,
-        phone,
-        message:
-          'You are not registered with us. Please register here: https://reacterai.lovable.app/',
-      };
-    }
+    try {
+      const trimmedPhone = phone?.trim();
+      if (!trimmedPhone) {
+        throw new BadRequestException('phone is required');
+      }
+      const user = await this.usersRepository.findOne({
+        where: { phone: trimmedPhone },
+      });
+      if (!user) {
+        return {
+          success: false,
+          phone,
+          message:
+            'You are not registered with us. Please register here: https://reacterai.lovable.app/',
+        };
+      }
 
-    await this.messageRepository.createMessage({
-      prompt: phoneDto.message,
-      response: null,
-      userId: user.id,
-    });
+      await this.messageRepository.createMessage({
+        prompt: phoneDto.message,
+        response: null,
+        userId: user.id,
+      });
 
-    const record = await this.googleTokenRepository.findByUserId(user.id);
+      const record = await this.googleTokenRepository.findByUserId(user.id);
 
-    if (!record) {
-      return {
-        success: false,
-        phone,
-        message:
-          'Your google calendar is not connected. Please connect your google account here: https://reacterai.lovable.app/',
-      };
-    }
+      if (!record) {
+        return {
+          success: false,
+          phone,
+          message:
+            'Your google calendar is not connected. Please connect your google account here: https://reacterai.lovable.app/',
+        };
+      }
 
-    const response = await this.aiService.generateResponse({
-      prompt: phoneDto.message,
-    });
+      const response = await this.aiService.generateResponse({
+        prompt: phoneDto.message,
+      });
 
-    console.log(response);
+      console.log(response);
 
-    const parsedResponse = JSON.parse(response as any);
+      const parsedResponse = JSON.parse(response as any);
 
-    if (!parsedResponse) {
+      if (!parsedResponse) {
+        return {
+          message: 'Something went wrong. Please try again.',
+          success: false,
+          phone,
+        };
+      }
+
+      if (parsedResponse.action === 'create') {
+        await this.createGoogleEvent(parsedResponse, user.id);
+        return {
+          message: 'Event created successfully',
+          success: true,
+          phone,
+        };
+      } else if (parsedResponse.action === 'update') {
+        await this.updateGoogleEvent(
+          user.id,
+          parsedResponse.eventId,
+          parsedResponse,
+        );
+        return {
+          message: 'Event updated successfully',
+          success: true,
+          phone,
+        };
+      } else if (parsedResponse.action === 'delete') {
+        await this.deleteGoogleEvent(user.id, parsedResponse.eventId);
+        return {
+          message: 'Event deleted successfully',
+          success: true,
+          phone,
+        };
+      } else {
+        return {
+          message: 'Invalid action. Please try again.',
+          success: false,
+          phone,
+        };
+      }
+    } catch (error) {
+      console.error(error);
       return {
         message: 'Something went wrong. Please try again.',
-        success: false,
-        phone,
-      };
-    }
-
-    if (parsedResponse.action === 'create') {
-      await this.createGoogleEvent(parsedResponse, user.id);
-      return {
-        message: 'Event created successfully',
-        success: true,
-        phone,
-      };
-    } else if (parsedResponse.action === 'update') {
-      await this.updateGoogleEvent(
-        user.id,
-        parsedResponse.eventId,
-        parsedResponse,
-      );
-      return {
-        message: 'Event updated successfully',
-        success: true,
-        phone,
-      };
-    } else if (parsedResponse.action === 'delete') {
-      await this.deleteGoogleEvent(user.id, parsedResponse.eventId);
-      return {
-        message: 'Event deleted successfully',
-        success: true,
-        phone,
-      };
-    } else {
-      return {
-        message: 'Invalid action. Please try again.',
         success: false,
         phone,
       };

@@ -71,7 +71,6 @@ export class AIService {
                   'response',
                   'startDateTime',
                   'endDateTime',
-                  'recipients',
                 ],
                 additionalProperties: false,
               },
