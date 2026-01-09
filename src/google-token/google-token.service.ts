@@ -37,6 +37,34 @@ export class GoogleTokenService {
     return record ?? { exists: false };
   }
 
+  async verifyUser(phone: string) {
+    const trimmedPhone = phone?.trim();
+    if (!trimmedPhone) {
+      return {
+        valid: false,
+        googleConnected: false,
+      };
+    }
+
+    const user = await this.usersRepository.findOne({
+      where: { phone: trimmedPhone },
+    });
+
+    if (!user) {
+      return {
+        valid: false,
+        googleConnected: false,
+      };
+    }
+
+    const googleToken = await this.googleTokenRepository.findByUserId(user.id);
+
+    return {
+      valid: true,
+      googleConnected: !!googleToken,
+    };
+  }
+
   async getForPhone(phone: string, phoneDto: GetGoogleTokenByPhoneDto) {
     try {
       const trimmedPhone = phone?.trim();

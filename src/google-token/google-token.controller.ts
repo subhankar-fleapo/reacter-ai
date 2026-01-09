@@ -19,6 +19,11 @@ export class GoogleTokenController {
     return this.service.getForPhone(phone, phoneDto);
   }
 
+  @Get('verify-user')
+  verifyUser(@Query('phone') phone: string) {
+    return this.service.verifyUser(phone);
+  }
+
   @Post()
   saveMine(
     @Headers('authorization') authorization: string,
