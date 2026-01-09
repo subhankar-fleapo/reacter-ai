@@ -1,16 +1,23 @@
+import { HttpService } from '@nestjs/axios';
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { AIService } from 'src/ai/ai.service';
+import { AIResponseDto } from 'src/ai/dto/ai.dto';
 import {
   GoogleTokenRepository,
   MessageRepository,
   UsersRepository,
 } from '../data/repositories';
 import { GetGoogleTokenByPhoneDto, UpsertGoogleTokenDto } from './dto';
-import { AIService } from 'src/ai/ai.service';
+import { authenticate } from '@google-cloud/local-auth';
+import path from 'path';
+import { google } from 'googleapis';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class GoogleTokenService {
@@ -20,6 +27,8 @@ export class GoogleTokenService {
     private readonly googleTokenRepository: GoogleTokenRepository,
     private readonly messageRepository: MessageRepository,
     private readonly aiService: AIService,
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
   ) {}
 
   async getForUser(authHeader: string) {
@@ -45,6 +54,12 @@ export class GoogleTokenService {
       response: null,
       userId: user.id,
     });
+
+    const response = await this.aiService.generateResponse({
+      prompt: phoneDto.message,
+    });
+
+    await this.createGoogleEvent(response, user.id);
 
     const record = await this.googleTokenRepository.findByUserId(user.id);
     return record
@@ -116,4 +131,68 @@ export class GoogleTokenService {
 
     return { email, accessToken, refreshToken, expiresAt: expiresDate };
   }
+
+  public async createGoogleEvent(dto: AIResponseDto, userId: string) {
+    const user = await this.googleTokenRepository.findByUserId(userId);
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // console.log({user})
+
+    const oauth2Client = new google.auth.OAuth2(
+      this.configService.get('GOOGLE_CLIENT_ID'),
+      this.configService.get('GOOGLE_CLIENT_SECRET'),
+      'http://localhost:8080/google/callback',
+    );
+
+    oauth2Client.setCredentials({
+      access_token: user.accessToken,
+      refresh_token: user.refreshToken,
+      expiry_date: user.expiresAt.getTime(),
+    });
+
+    const jsonDto = JSON.parse(dto as any);
+
+    oauth2Client.setCredentials({
+      access_token: user.accessToken,
+      refresh_token: user.refreshToken,
+      expiry_date: user.expiresAt.getTime(),
+    });
+
+    if (new Date(user.expiresAt).getTime() < Date.now()) {
+      const { credentials } = await oauth2Client.refreshAccessToken();
+
+      //TODO: save the new tokes to the user
+    }
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    const calendarList = await calendar.calendarList.list();
+
+    const calendars = calendarList.data.items;
+
+    const writableCal = calendars!.find(
+      (cal) => cal.summary === 'Reacter Calendar 4',
+    );
+
+    await calendar.events.insert({
+      calendarId: writableCal!.id!,
+      requestBody: {
+        summary: jsonDto.title,
+        description: 'test desc',
+        start: {
+          dateTime: new Date(jsonDto.startDateTime).toISOString(),
+          timeZone: 'Asia/Kolkata',
+        },
+        end: {
+          dateTime: new Date(jsonDto.endDateTime).toISOString(),
+          timeZone: 'Asia/Kolkata',
+        },
+      },
+    });
+  }
+
+  public async oauth2callback(code: string, state: string) {}
 }

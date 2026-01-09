@@ -36,13 +36,13 @@ export class AIService {
                   },
                   startDateTime: {
                     type: 'string',
-                    format: 'date-time',
-                    description: 'Start date and time of the meeting',
+                    description:
+                      'Start date-time in ISO 8601 format ONLY (YYYY-MM-DDTHH:mm:ss.sss)',
                   },
                   endDateTime: {
                     type: 'string',
-                    format: 'date-time',
-                    description: 'End date and time of the meeting',
+                    description:
+                      'End date-time in ISO 8601 format ONLY (YYYY-MM-DDTHH:mm:ss.sss)',
                   },
                   tool: {
                     type: 'string',
@@ -59,7 +59,13 @@ export class AIService {
                     description: 'Response from the model',
                   },
                 },
-                required: ['tool', 'action', 'response'],
+                required: [
+                  'tool',
+                  'action',
+                  'response',
+                  'startDateTime',
+                  'endDateTime',
+                ],
                 additionalProperties: false,
               },
             },
