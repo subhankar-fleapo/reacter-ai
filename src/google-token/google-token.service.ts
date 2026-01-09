@@ -5,14 +5,12 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import {
-  UsersRepository,
   GoogleTokenRepository,
   MessageRepository,
+  UsersRepository,
 } from '../data/repositories';
-import {
-  GetGoogleTokenByPhoneDto,
-  UpsertGoogleTokenDto,
-} from './google-token.dto';
+import { GetGoogleTokenByPhoneDto, UpsertGoogleTokenDto } from './dto';
+import { AIService } from 'src/ai/ai.service';
 
 @Injectable()
 export class GoogleTokenService {
@@ -21,6 +19,7 @@ export class GoogleTokenService {
     private readonly usersRepository: UsersRepository,
     private readonly googleTokenRepository: GoogleTokenRepository,
     private readonly messageRepository: MessageRepository,
+    private readonly aiService: AIService,
   ) {}
 
   async getForUser(authHeader: string) {

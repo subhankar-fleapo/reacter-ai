@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
+import { AIModule } from 'src/ai/ai.module';
+import { DatabaseModule } from '../data/database.module';
 import { GoogleTokenController } from './google-token.controller';
 import { GoogleTokenService } from './google-token.service';
-import { DatabaseModule } from '../data/database.module';
 
 @Module({
   imports: [
+    AIModule,
     DatabaseModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

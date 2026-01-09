@@ -1,15 +1,22 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { Actions, Tools } from './dto';
-import { AIResponseOutput } from './dto/ai.dto';
+import { AIResponseDto, AIResponseOutput } from './dto/ai.dto';
 
 @Injectable()
 export class AIService {
   constructor(private readonly httpService: HttpService) {}
 
+  async onModuleInit() {
+    const d = await this.generateResponse({
+      prompt: 'Schedule a meeting with John Doe at 10:00 AM',
+    });
+    console.log(d);
+  }
+
   public async generateResponse(input: {
     prompt: string;
-  }): Promise<{ action: Actions; tool: Tools; response: string }> {
+  }): Promise<AIResponseDto> {
     try {
       const { data } = await this.httpService.axiosRef.post<AIResponseOutput>(
         '/chat/completions',
@@ -30,6 +37,20 @@ export class AIService {
               schema: {
                 type: 'object',
                 properties: {
+                  title: {
+                    type: 'string',
+                    description: 'Title of the meeting',
+                  },
+                  startDateTime: {
+                    type: 'string',
+                    format: 'date-time',
+                    description: 'Start date and time of the meeting',
+                  },
+                  endDateTime: {
+                    type: 'string',
+                    format: 'date-time',
+                    description: 'End date and time of the meeting',
+                  },
                   tool: {
                     type: 'string',
                     enum: Object.values(Tools),

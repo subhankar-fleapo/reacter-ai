@@ -1,9 +1,6 @@
 import { Body, Controller, Get, Headers, Post, Query } from '@nestjs/common';
+import { GetGoogleTokenByPhoneDto, UpsertGoogleTokenDto } from './dto';
 import { GoogleTokenService } from './google-token.service';
-import {
-  GetGoogleTokenByPhoneDto,
-  UpsertGoogleTokenDto,
-} from './google-token.dto';
 
 @Controller('google-token')
 export class GoogleTokenController {

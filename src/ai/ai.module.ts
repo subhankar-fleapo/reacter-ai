@@ -19,5 +19,6 @@ import { ConfigService } from '@nestjs/config';
     }),
   ],
   providers: [AIService],
+  exports: [AIService, HttpModule],
 })
 export class AIModule {}
