@@ -4,7 +4,7 @@ import { Injectable } from '@nestjs/common';
 export class SlackService {
   constructor() {}
 
-  async generateResponse(input: { prompt: string }): Promise<string> {
+  async generateResponse(): Promise<string> {
     return 'hello';
   }
 }

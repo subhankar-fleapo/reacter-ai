@@ -14,8 +14,6 @@ import {
   UsersRepository,
 } from '../data/repositories';
 import { GetGoogleTokenByPhoneDto, UpsertGoogleTokenDto } from './dto';
-import { authenticate } from '@google-cloud/local-auth';
-import path from 'path';
 import { google } from 'googleapis';
 import { ConfigService } from '@nestjs/config';
 import { GoogleCalendarService } from 'src/google-calendar/google-calendar.service';
@@ -31,7 +29,7 @@ export class GoogleTokenService {
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
     private readonly googleCalendarService: GoogleCalendarService,
-  ) { }
+  ) {}
 
   async getForUser(authHeader: string) {
     const user = await this.resolveUserFromAuth(authHeader);
@@ -63,13 +61,16 @@ export class GoogleTokenService {
 
     console.log(response);
 
-
     const parsedResponse = JSON.parse(response as any);
 
     if (parsedResponse.action === 'create') {
       await this.createGoogleEvent(parsedResponse, user.id);
     } else if (parsedResponse.action === 'update') {
-      await this.updateGoogleEvent(user.id, parsedResponse.eventId, parsedResponse);
+      await this.updateGoogleEvent(
+        user.id,
+        parsedResponse.eventId,
+        parsedResponse,
+      );
     } else if (parsedResponse.action === 'delete') {
       await this.deleteGoogleEvent(user.id, parsedResponse.eventId);
     }
@@ -146,9 +147,8 @@ export class GoogleTokenService {
   }
 
   public async createGoogleEvent(dto: AIResponseDto, userId: string) {
-    const { calendar, calendarId } = await this.getAuthenticatedCalendarClient(
-      userId,
-    );
+    const { calendar, calendarId } =
+      await this.getAuthenticatedCalendarClient(userId);
 
     await this.googleCalendarService.createEvent(calendar, calendarId, dto);
   }
@@ -158,9 +158,8 @@ export class GoogleTokenService {
     eventId: string,
     dto: AIResponseDto,
   ) {
-    const { calendar, calendarId } = await this.getAuthenticatedCalendarClient(
-      userId,
-    );
+    const { calendar, calendarId } =
+      await this.getAuthenticatedCalendarClient(userId);
     await this.googleCalendarService.updateEvent(
       calendar,
       calendarId,
@@ -170,9 +169,8 @@ export class GoogleTokenService {
   }
 
   public async deleteGoogleEvent(userId: string, eventId: string) {
-    const { calendar, calendarId } = await this.getAuthenticatedCalendarClient(
-      userId,
-    );
+    const { calendar, calendarId } =
+      await this.getAuthenticatedCalendarClient(userId);
 
     //list all google cal events
     const events = await calendar.events.list({
@@ -238,6 +236,4 @@ export class GoogleTokenService {
 
     return { calendar, calendarId: writableCal.id };
   }
-
-  public async oauth2callback(code: string, state: string) { }
 }
