@@ -18,6 +18,7 @@ import { authenticate } from '@google-cloud/local-auth';
 import path from 'path';
 import { google } from 'googleapis';
 import { ConfigService } from '@nestjs/config';
+import { GoogleCalendarService } from 'src/google-calendar/google-calendar.service';
 
 @Injectable()
 export class GoogleTokenService {
@@ -29,7 +30,8 @@ export class GoogleTokenService {
     private readonly aiService: AIService,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
-  ) {}
+    private readonly googleCalendarService: GoogleCalendarService,
+  ) { }
 
   async getForUser(authHeader: string) {
     const user = await this.resolveUserFromAuth(authHeader);
@@ -59,7 +61,18 @@ export class GoogleTokenService {
       prompt: phoneDto.message,
     });
 
-    await this.createGoogleEvent(response, user.id);
+    console.log(response);
+
+
+    const parsedResponse = JSON.parse(response as any);
+
+    if (parsedResponse.action === 'create') {
+      await this.createGoogleEvent(parsedResponse, user.id);
+    } else if (parsedResponse.action === 'update') {
+      await this.updateGoogleEvent(user.id, parsedResponse.eventId, parsedResponse);
+    } else if (parsedResponse.action === 'delete') {
+      await this.deleteGoogleEvent(user.id, parsedResponse.eventId);
+    }
 
     const record = await this.googleTokenRepository.findByUserId(user.id);
     return record
@@ -133,13 +146,53 @@ export class GoogleTokenService {
   }
 
   public async createGoogleEvent(dto: AIResponseDto, userId: string) {
+    const { calendar, calendarId } = await this.getAuthenticatedCalendarClient(
+      userId,
+    );
+
+    await this.googleCalendarService.createEvent(calendar, calendarId, dto);
+  }
+
+  public async updateGoogleEvent(
+    userId: string,
+    eventId: string,
+    dto: AIResponseDto,
+  ) {
+    const { calendar, calendarId } = await this.getAuthenticatedCalendarClient(
+      userId,
+    );
+    await this.googleCalendarService.updateEvent(
+      calendar,
+      calendarId,
+      eventId,
+      dto,
+    );
+  }
+
+  public async deleteGoogleEvent(userId: string, eventId: string) {
+    const { calendar, calendarId } = await this.getAuthenticatedCalendarClient(
+      userId,
+    );
+
+    //list all google cal events
+    const events = await calendar.events.list({
+      calendarId,
+      maxResults: 10,
+      singleEvents: true,
+      orderBy: 'startTime',
+    });
+
+    console.log(events.data.items);
+
+    await this.googleCalendarService.deleteEvent(calendar, calendarId, eventId);
+  }
+
+  private async getAuthenticatedCalendarClient(userId: string) {
     const user = await this.googleTokenRepository.findByUserId(userId);
 
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
-
-    // console.log({user})
 
     const oauth2Client = new google.auth.OAuth2(
       this.configService.get('GOOGLE_CLIENT_ID'),
@@ -153,18 +206,20 @@ export class GoogleTokenService {
       expiry_date: user.expiresAt.getTime(),
     });
 
-    const jsonDto = JSON.parse(dto as any);
-
-    oauth2Client.setCredentials({
-      access_token: user.accessToken,
-      refresh_token: user.refreshToken,
-      expiry_date: user.expiresAt.getTime(),
-    });
-
     if (new Date(user.expiresAt).getTime() < Date.now()) {
       const { credentials } = await oauth2Client.refreshAccessToken();
 
-      //TODO: save the new tokes to the user
+      if (credentials.access_token) {
+        user.accessToken = credentials.access_token;
+      }
+      if (credentials.refresh_token) {
+        user.refreshToken = credentials.refresh_token;
+      }
+      if (credentials.expiry_date) {
+        user.expiresAt = new Date(credentials.expiry_date);
+      }
+
+      await this.googleTokenRepository.save(user);
     }
 
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
@@ -177,22 +232,12 @@ export class GoogleTokenService {
       (cal) => cal.summary === 'Reacter Calendar 4',
     );
 
-    await calendar.events.insert({
-      calendarId: writableCal!.id!,
-      requestBody: {
-        summary: jsonDto.title,
-        description: 'test desc',
-        start: {
-          dateTime: new Date(jsonDto.startDateTime).toISOString(),
-          timeZone: 'Asia/Kolkata',
-        },
-        end: {
-          dateTime: new Date(jsonDto.endDateTime).toISOString(),
-          timeZone: 'Asia/Kolkata',
-        },
-      },
-    });
+    if (!writableCal?.id) {
+      throw new InternalServerErrorException('Calendar not found');
+    }
+
+    return { calendar, calendarId: writableCal.id };
   }
 
-  public async oauth2callback(code: string, state: string) {}
+  public async oauth2callback(code: string, state: string) { }
 }

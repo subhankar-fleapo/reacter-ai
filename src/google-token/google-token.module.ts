@@ -6,6 +6,7 @@ import { DatabaseModule } from '../data/database.module';
 import { GoogleTokenController } from './google-token.controller';
 import { GoogleTokenService } from './google-token.service';
 import { HttpModule } from '@nestjs/axios';
+import { GoogleCalendarModule } from 'src/google-calendar/google-calendar.module';
 
 @Module({
   imports: [
@@ -21,8 +22,9 @@ import { HttpModule } from '@nestjs/axios';
         },
       }),
     }),
+    GoogleCalendarModule,
   ],
   controllers: [GoogleTokenController],
   providers: [GoogleTokenService],
 })
-export class GoogleTokenModule {}
+export class GoogleTokenModule { }
