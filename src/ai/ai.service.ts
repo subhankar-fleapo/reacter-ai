@@ -7,13 +7,6 @@ import { AIResponseDto, AIResponseOutput } from './dto/ai.dto';
 export class AIService {
   constructor(private readonly httpService: HttpService) {}
 
-  async onModuleInit() {
-    const d = await this.generateResponse({
-      prompt: 'Schedule a meeting with John Doe at 10:00 AM',
-    });
-    console.log(d);
-  }
-
   public async generateResponse(input: {
     prompt: string;
   }): Promise<AIResponseDto> {

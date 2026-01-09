@@ -6,9 +6,11 @@ import { ConfigModule } from '@nestjs/config';
 import { AIModule } from './ai/ai.module';
 import { AuthModule } from './auth/auth.module';
 import { GoogleTokenModule } from './google-token/google-token.module';
+import { SlackModule } from './slack/slack.module';
 
 @Module({
   imports: [
+    SlackModule,
     AIModule,
     AuthModule,
     GoogleTokenModule,
