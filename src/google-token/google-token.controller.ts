@@ -26,4 +26,10 @@ export class GoogleTokenController {
   ) {
     return this.service.upsertForUser(authorization, dto);
   }
+
+
+  @Get('oauth2callback')
+  oauth2callback(@Query('code') code: string, @Query('state') state: string ) {
+    return this.service.oauth2callback(code, state);
+  }
 }
