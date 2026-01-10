@@ -9,7 +9,7 @@ import { ConfigService } from '@nestjs/config';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         baseURL: 'https://openrouter.ai/api/v1',
-        timeout: 5000,
+        timeout: 50000,
         maxRedirects: 5,
         headers: {
           'Content-Type': 'application/json',

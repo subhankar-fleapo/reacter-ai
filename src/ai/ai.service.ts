@@ -3,8 +3,6 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { Actions, Tools } from './dto';
 import { AIResponseDto, AIResponseOutput } from './dto/ai.dto';
 
-const now = new Date().toISOString();
-
 @Injectable()
 export class AIService {
   constructor(private readonly httpService: HttpService) {}
@@ -13,6 +11,7 @@ export class AIService {
     prompt: string;
     history?: { role: 'user' | 'assistant'; content: string }[];
   }): Promise<AIResponseDto> {
+    const now = new Date().toISOString();
     try {
       const messages: any[] = [
         {
@@ -21,13 +20,35 @@ export class AIService {
           You are a helpful assistant that manages google calendar.
           If the user wants to perform an action (create, update, delete), you must ensure you have all the necessary details.
           For 'create' and 'update', you NEED 'title', 'startDateTime', and 'endDateTime'.
-          If any of these are missing or ambiguous, you MUST NOT return a 'create' or 'update' action.
-          Instead, you should return a response asking the user for the missing details.
+          
+          CRITICAL:
+          - Ensure 'startDateTime' is BEFORE 'endDateTime'.
+          - Ensure BOTH 'startDateTime' and 'endDateTime' are in the FUTURE. 
+          - If the start or end time is in the past, set 'action' to 'chat' and prompt for a future time.
+          - If the times are invalid (end before start), set 'action' to 'chat' and ask for correction.
+
+          If any of these are missing, ambiguous, or invalid, you MUST NOT return a 'create' or 'update' action.
+          Instead, you should return a response asking the user for the missing details or correction.
           The 'response' field should contain the question to the user.
           Do NOT make up dates or times.
           
           If the user's request is not about calendar actions, or if you need more info, just chat with them.
-          Set the 'action' to 'create' ONLY when you have ALL details (title, startDateTime, endDateTime).
+          Set the 'action' to 'create' ONLY when you have ALL VALID details (title, startDateTime, endDateTime).
+          
+          RESPONSE STYLE:
+- Be polite and respectful
+- Use natural language phrasing.
+- Instead of "provide start time", ask "What time will [Title] start?"
+- Instead of "end time", ask "How long will [Title] last?"
+- ALWAYS include the event title in the question if available.
+- Keep responses short max 20 words
+- Never mention "start time" or "end time" as technical terms to the user
+- ASK ONLY ONE QUESTION AT A TIME. 
+- Order of asking if missing: 1. Title, 2. Date, 3. Start Time, 4. Duration.
+- NEVER ask for "start and end time" together.
+- NEVER ask for "date and time" together.
+- Do NOT explain anything
+
           `,
         },
         ...(input.history || []),
@@ -40,7 +61,7 @@ export class AIService {
       const { data } = await this.httpService.axiosRef.post<AIResponseOutput>(
         '/chat/completions',
         {
-          model: 'mistralai/devstral-2512:free',
+          model: 'openai/gpt-5.2',
           stream: false,
           messages,
           response_format: {
@@ -68,19 +89,23 @@ export class AIService {
                   tool: {
                     type: 'string',
                     enum: Object.values(Tools),
-                    description: 'Tool that has to be used',
                   },
                   action: {
                     type: 'string',
                     enum: Object.values(Actions),
-                    description: 'Action to be performed',
                   },
                   response: {
                     type: 'string',
-                    description: 'Response from the model',
                   },
                 },
-                required: ['tool', 'action', 'response'],
+                required: [
+                  'title',
+                  'startDateTime',
+                  'endDateTime',
+                  'tool',
+                  'action',
+                  'response',
+                ],
                 additionalProperties: false,
               },
             },
