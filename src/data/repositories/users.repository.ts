@@ -22,10 +22,12 @@ export class UsersRepository extends Repository<UsersEntity> {
   public async createUser(input: {
     phone: string;
     password: string;
+    timezoneOffset?: string;
   }): Promise<UsersEntity> {
     const user = this.create({
       phone: input.phone,
       password: input.password,
+      timezoneOffset: input.timezoneOffset || '+05:30',
     });
 
     return this.save(user);

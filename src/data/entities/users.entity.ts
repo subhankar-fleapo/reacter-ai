@@ -18,6 +18,9 @@ export class UsersEntity {
   @Column({})
   password: string;
 
+  @Column({ type: 'varchar', nullable: true, name: 'timezone_offset' })
+  timezoneOffset: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 
