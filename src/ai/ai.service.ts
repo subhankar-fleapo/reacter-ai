@@ -11,13 +11,18 @@ export class AIService {
     prompt: string;
     history?: { role: 'user' | 'assistant'; content: string }[];
   }): Promise<AIResponseDto> {
-    const now = new Date().toISOString();
+    const now = new Date().toLocaleString('en-US', {
+      timeZone: 'Asia/Kolkata',
+    });
     try {
       const messages: any[] = [
         {
           role: 'system',
-          content: `Today is ${now}. Use this as the reference for words like today, tomorrow, yesterday. 
+          content: `Current time in Asia/Kolkata is ${now}. Use this as the reference for words like today, tomorrow, yesterday. 
           You are a helpful assistant that manages google calendar.
+          Assume all events are in 'Asia/Kolkata' timezone (+05:30).
+          When calculating ISO strings, ensure you apply the correct offset for Asia/Kolkata.
+          
           If the user wants to perform an action (create, update, delete), you must ensure you have all the necessary details.
           For 'create' and 'update', you NEED 'title', 'startDateTime', and 'endDateTime'.
           
