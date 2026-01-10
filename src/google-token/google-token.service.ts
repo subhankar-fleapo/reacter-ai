@@ -12,6 +12,7 @@ import {
   GoogleTokenRepository,
   MessageRepository,
   UsersRepository,
+  CalendarEventRepository,
 } from '../data/repositories';
 import { GetGoogleTokenByPhoneDto, UpsertGoogleTokenDto } from './dto';
 import { google } from 'googleapis';
@@ -25,6 +26,7 @@ export class GoogleTokenService {
     private readonly usersRepository: UsersRepository,
     private readonly googleTokenRepository: GoogleTokenRepository,
     private readonly messageRepository: MessageRepository,
+    private readonly calendarEventRepository: CalendarEventRepository,
     private readonly aiService: AIService,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
@@ -150,6 +152,8 @@ export class GoogleTokenService {
       // Check for required fields for actions
       const { action } = parsedResponse;
 
+      console.log(parsedResponse);
+
       if (action === 'create' || action === 'update') {
         // delete all messages
         await this.messageRepository.deleteMessages(user.id);
@@ -162,11 +166,21 @@ export class GoogleTokenService {
             phone,
           };
         } else {
-          await this.updateGoogleEvent(
+          // Use title or original message as search query
+          const searchQuery =
+            parsedResponse.title || phoneDto.message || parsedResponse.eventId;
+          const updateResult = await this.updateGoogleEvent(
             user.id,
-            parsedResponse.eventId,
+            searchQuery,
             parsedResponse,
           );
+          if (!updateResult.success) {
+            return {
+              message: updateResult.message || 'Provided event not found',
+              success: false,
+              phone,
+            };
+          }
           return {
             message: parsedResponse.response || 'Event updated successfully',
             success: true,
@@ -174,7 +188,17 @@ export class GoogleTokenService {
           };
         }
       } else if (action === 'delete') {
-        await this.deleteGoogleEvent(user.id, parsedResponse.eventId);
+        // Use title or original message as search query
+        const searchQuery =
+          parsedResponse.title || phoneDto.message || parsedResponse.eventId;
+        const deleteResult = await this.deleteGoogleEvent(user.id, searchQuery);
+        if (!deleteResult.success) {
+          return {
+            message: deleteResult.message || 'Provided event not found',
+            success: false,
+            phone,
+          };
+        }
         return {
           message: parsedResponse.response || 'Event deleted successfully',
           success: true,
@@ -267,39 +291,109 @@ export class GoogleTokenService {
     const { calendar, calendarId } =
       await this.getAuthenticatedCalendarClient(userId);
 
-    await this.googleCalendarService.createEvent(calendar, calendarId, dto);
+    const googleEvent = await this.googleCalendarService.createEvent(
+      calendar,
+      calendarId,
+      dto,
+    );
+
+    // Save event to database for future reference
+    await this.calendarEventRepository.createEvent({
+      userId,
+      googleEventId: googleEvent.data.id!,
+      title: dto.title,
+      description: (dto as any).description || null,
+      startDateTime: new Date(dto.startDateTime),
+      endDateTime: new Date(dto.endDateTime),
+      calendarId,
+    });
   }
 
   public async updateGoogleEvent(
     userId: string,
-    eventId: string,
+    searchQuery: string,
     dto: AIResponseDto,
-  ) {
+  ): Promise<{ success: boolean; message?: string }> {
+    // Find event in database by search query
+    const dbEvents = await this.calendarEventRepository.searchByTitle(
+      userId,
+      searchQuery,
+    );
+
+    if (dbEvents.length === 0) {
+      return { success: false, message: 'Provided event not found' };
+    }
+
+    // Use the first matching event (most recent)
+    const dbEvent = dbEvents[0];
+    if (!dbEvent) {
+      return { success: false, message: 'Provided event not found' };
+    }
+
+    const googleEventId = dbEvent.googleEventId;
+
     const { calendar, calendarId } =
       await this.getAuthenticatedCalendarClient(userId);
+
+    // Update in Google Calendar
     await this.googleCalendarService.updateEvent(
       calendar,
       calendarId,
-      eventId,
+      googleEventId,
       dto,
     );
+
+    // Update in database
+    await this.calendarEventRepository.updateEvent(dbEvent.id, {
+      title: dto.title || dbEvent.title,
+      description: (dto as any).description || dbEvent.description,
+      startDateTime: dto.startDateTime
+        ? new Date(dto.startDateTime)
+        : dbEvent.startDateTime,
+      endDateTime: dto.endDateTime
+        ? new Date(dto.endDateTime)
+        : dbEvent.endDateTime,
+    });
+
+    return { success: true };
   }
 
-  public async deleteGoogleEvent(userId: string, eventId: string) {
+  public async deleteGoogleEvent(
+    userId: string,
+    searchQuery: string,
+  ): Promise<{ success: boolean; message?: string }> {
+    // Find event in database by search query
+    const dbEvents = await this.calendarEventRepository.searchByTitle(
+      userId,
+      searchQuery,
+    );
+
+    if (dbEvents.length === 0) {
+      return { success: false, message: 'Provided event not found' };
+    }
+
+    // Use the first matching event (most recent)
+    const dbEvent = dbEvents[0];
+    if (!dbEvent) {
+      return { success: false, message: 'Provided event not found' };
+    }
+
+    const googleEventId = dbEvent.googleEventId;
+
     const { calendar, calendarId } =
       await this.getAuthenticatedCalendarClient(userId);
 
-    //list all google cal events
-    const events = await calendar.events.list({
+    // Delete from Google Calendar
+    await this.googleCalendarService.deleteEvent(
+      calendar,
       calendarId,
-      maxResults: 10,
-      singleEvents: true,
-      orderBy: 'startTime',
-    });
+      googleEventId,
+    );
 
-    console.log(events.data.items);
+    // Soft delete in database
+    await this.calendarEventRepository.deleteEvent(dbEvent.id);
 
-    await this.googleCalendarService.deleteEvent(calendar, calendarId, eventId);
+    return { success: true };
   }
 
   private async getAuthenticatedCalendarClient(userId: string) {
