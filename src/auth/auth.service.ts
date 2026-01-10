@@ -21,7 +21,7 @@ export class AuthService {
   ) {}
 
   async signup(dto: SignupDto) {
-    const { phone, password, timezoneOffset } = this.validateCredentials(dto);
+    const { phone, password } = this.validateCredentials(dto);
 
     const existingUser = await this.usersRepository.findByPhone(phone);
     if (existingUser) {
@@ -32,7 +32,6 @@ export class AuthService {
     const user = await this.usersRepository.createUser({
       phone,
       password: hashedPassword,
-      timezoneOffset: timezoneOffset || undefined,
     });
 
     const safeUser = this.sanitizeUser(user);
@@ -62,20 +61,15 @@ export class AuthService {
     };
   }
 
-  private validateCredentials(dto: {
-    phone: string;
-    password: string;
-    timezoneOffset?: string;
-  }) {
+  private validateCredentials(dto: { phone: string; password: string }) {
     const phone = dto.phone?.trim();
     const password = dto.password?.trim();
-    const timezoneOffset = dto.timezoneOffset?.trim();
 
     if (!phone || !password) {
       throw new BadRequestException('Phone and password are required');
     }
 
-    return { phone, password, timezoneOffset };
+    return { phone, password };
   }
 
   private async hashPassword(password: string): Promise<string> {

@@ -25,10 +25,14 @@ export class MessageRepository extends Repository<MessageEntity> {
     return this.save(message);
   }
 
-  public async getLastMessages(userId: string): Promise<MessageEntity[]> {
+  public async getLastMessages(
+    userId: string,
+    limit: number,
+  ): Promise<MessageEntity[]> {
     return this.find({
       where: { userId },
       order: { createdAt: 'DESC' },
+      take: limit,
     });
   }
 

@@ -85,7 +85,7 @@ export class GoogleTokenService {
         };
       }
 
-      const history = await this.messageRepository.getLastMessages(user.id);
+      const history = await this.messageRepository.getLastMessages(user.id, 10);
 
       const formattedHistory = history
         .map((msg) => {
@@ -291,17 +291,10 @@ export class GoogleTokenService {
     const { calendar, calendarId } =
       await this.getAuthenticatedCalendarClient(userId);
 
-    // Get user's timezone offset
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
-    const timezone = this.getTimezoneFromOffset(
-      user?.timezoneOffset || '+05:30',
-    );
-
     const googleEvent = await this.googleCalendarService.createEvent(
       calendar,
       calendarId,
       dto,
-      timezone,
     );
 
     // Save event to database for future reference
@@ -342,19 +335,12 @@ export class GoogleTokenService {
     const { calendar, calendarId } =
       await this.getAuthenticatedCalendarClient(userId);
 
-    // Get user's timezone offset
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
-    const timezone = this.getTimezoneFromOffset(
-      user?.timezoneOffset || '+05:30',
-    );
-
     // Update in Google Calendar
     await this.googleCalendarService.updateEvent(
       calendar,
       calendarId,
       googleEventId,
       dto,
-      timezone,
     );
 
     // Update in database
@@ -475,62 +461,5 @@ export class GoogleTokenService {
     }
 
     return { calendar, calendarId: writableCalId };
-  }
-
-  private getTimezoneFromOffset(offset: string): string {
-    // If it's already an IANA timezone (contains '/'), return as is
-    if (offset.includes('/')) {
-      return offset;
-    }
-
-    // Common timezone offset to IANA mapping
-    const offsetToTimezone: Record<string, string> = {
-      '-12:00': 'Etc/GMT+12',
-      '-11:00': 'Pacific/Pago_Pago',
-      '-10:00': 'Pacific/Honolulu',
-      '-09:30': 'Pacific/Marquesas',
-      '-09:00': 'America/Anchorage',
-      '-08:00': 'America/Los_Angeles',
-      '-07:00': 'America/Denver',
-      '-06:00': 'America/Chicago',
-      '-05:00': 'America/New_York',
-      '-04:00': 'America/Halifax',
-      '-03:30': 'America/St_Johns',
-      '-03:00': 'America/Sao_Paulo',
-      '-02:00': 'Etc/GMT+2',
-      '-01:00': 'Atlantic/Azores',
-      '+00:00': 'UTC',
-      '+01:00': 'Europe/Paris',
-      '+02:00': 'Europe/Athens',
-      '+03:00': 'Europe/Moscow',
-      '+03:30': 'Asia/Tehran',
-      '+04:00': 'Asia/Dubai',
-      '+04:30': 'Asia/Kabul',
-      '+05:00': 'Asia/Karachi',
-      '+05:30': 'Asia/Kolkata',
-      '+05:45': 'Asia/Kathmandu',
-      '+06:00': 'Asia/Dhaka',
-      '+06:30': 'Asia/Yangon',
-      '+07:00': 'Asia/Bangkok',
-      '+08:00': 'Asia/Shanghai',
-      '+08:45': 'Australia/Eucla',
-      '+09:00': 'Asia/Tokyo',
-      '+09:30': 'Australia/Adelaide',
-      '+10:00': 'Australia/Sydney',
-      '+10:30': 'Australia/Lord_Howe',
-      '+11:00': 'Pacific/Guadalcanal',
-      '+12:00': 'Pacific/Auckland',
-      '+12:45': 'Pacific/Chatham',
-      '+13:00': 'Pacific/Tongatapu',
-      '+14:00': 'Pacific/Kiritimati',
-    };
-
-    // Try to find exact match
-    if (offsetToTimezone[offset]) {
-      return offsetToTimezone[offset];
-    }
-
-    // If no match, default to Asia/Kolkata
-    return 'Asia/Kolkata';
   }
 }
