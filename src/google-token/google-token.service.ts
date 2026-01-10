@@ -343,14 +343,29 @@ export class GoogleTokenService {
 
     const calendars = calendarList.data.items;
 
-    const writableCal = calendars!.find(
-      (cal) => cal.summary === 'Reacter Calendar 4',
+    const writableCalendars = calendars!.find(
+      (cal) => cal.summary === 'Reacter Bookings',
     );
 
-    if (!writableCal?.id) {
+    let writableCalId = '';
+
+    if (!writableCalendars) {
+      const newWritableCal = await calendar.calendars.insert({
+        requestBody: {
+          summary: 'Reacters Bookings',
+          timeZone: 'Asia/Kolkata',
+          description: 'Calendar for events created via reacters platform',
+        },
+      });
+      writableCalId = newWritableCal.data.id || '';
+    } else {
+      writableCalId = writableCalendars.id!;
+    }
+
+    if (!writableCalId) {
       throw new InternalServerErrorException('Calendar not found');
     }
 
-    return { calendar, calendarId: writableCal.id };
+    return { calendar, calendarId: writableCalId };
   }
 }
